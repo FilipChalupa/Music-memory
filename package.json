@@ -10,6 +10,8 @@
 	"author": "",
 	"license": "ISC",
 	"devDependencies": {
+		"audio-loader": "^1.0.3",
+		"audio-play": "^2.2.0",
 		"serialport": "^6.2.2"
 	}
 }

@@ -58,6 +58,7 @@ void loop()
 
   // Dump debug info about the card. PICC_HaltA() is automatically called.
   // mfrc522.PICC_DumpToSerial(&(mfrc522.uid));
-  Serial.write(mfrc522.uid.size);
+  Serial.write(0);
   Serial.write(mfrc522.uid.uidByte, mfrc522.uid.size);
+  Serial.write(0);
 }
