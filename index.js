@@ -37,9 +37,8 @@ const port = new SerialPort('COM5')
 port.on('error', function(err) {
 	console.log('Error: ', err.message)
 })
-port.on('data', function(data) {
-	const uid = data.toString('base64')
-	console.log(data, data[0] === 0)
+
+function processCard(uid) {
 	if (uid !== lastPlayedCard) {
 		lastPlayedCard = uid
 		console.log('Card detected:', uid)
@@ -57,5 +56,20 @@ port.on('data', function(data) {
 		console.log('')
 
 		load(path.join(MUSIC_DIRECTORY, soundFile)).then(play)
+	}
+}
+
+let waitingForLength = true
+let nextIdLength = 1
+
+port.on('readable', () => {
+	let chunk
+	while (null !== (chunk = port.read(waitingForLength ? 1 : nextIdLength))) {
+		if (waitingForLength) {
+			nextIdLength = chunk[0]
+		} else {
+			processCard(chunk.toString('base64'))
+		}
+		waitingForLength = !waitingForLength
 	}
 })
