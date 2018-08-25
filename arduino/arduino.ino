@@ -30,12 +30,19 @@
 #include <SPI.h>
 #include <MFRC522.h>
 
+#define LED_READING 3
+#define LED_READING_MIN_DURATION 10
+
 #define SS_PIN 10
 #define RST_PIN 9
 MFRC522 mfrc522(SS_PIN, RST_PIN); // Create MFRC522 instance.
 
+int reading = 0;
+
 void setup()
 {
+  pinMode(LED_READING, OUTPUT);
+
   Serial.begin(9600); // Initialize serial communications with the PC
   SPI.begin();        // Init SPI bus
   mfrc522.PCD_Init(); // Init MFRC522 card
@@ -44,14 +51,20 @@ void setup()
 
 void loop()
 {
-  // Look for new cards
-  if (!mfrc522.PICC_IsNewCardPresent())
+  int hasSomethingToWrite = 0;
+  if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial())
   {
-    return;
+    hasSomethingToWrite = 1;
+    reading = LED_READING_MIN_DURATION;
+  }
+  else if (reading > 0)
+  {
+    reading -= 1;
   }
 
-  // Select one of the cards
-  if (!mfrc522.PICC_ReadCardSerial())
+  digitalWrite(LED_READING, reading ? HIGH : LOW);
+
+  if (!hasSomethingToWrite)
   {
     return;
   }
