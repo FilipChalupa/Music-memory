@@ -11,8 +11,6 @@
 	"author": "",
 	"license": "ISC",
 	"devDependencies": {
-		"audio-loader": "^1.0.3",
-		"audio-play": "^2.2.0",
 		"nodemon": "^1.18.3",
 		"serialport": "^6.2.2"
 	}

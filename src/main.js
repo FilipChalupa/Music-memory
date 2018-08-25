@@ -11,6 +11,8 @@ module.exports = class Main {
 		this.cardsPerGroup = 2
 		this.attachedCard = null
 		this.releaseCardAfter = 500
+		this.minimalAttachedTime = 2000
+		this.attachedAt = null
 		this.releaseCardAfterTimeout = null
 		this.cards = {}
 		this.unallocatedMusicReferences = []
@@ -75,13 +77,17 @@ module.exports = class Main {
 
 	_processCard(id) {
 		if (id !== this.attachedCard) {
+			this.attachedAt = new Date()
 			this._cardAttached(id)
 		}
+
+		const now = new Date()
+		const attachedDuration = now.getTime() - this.attachedAt.getTime()
 
 		clearTimeout(this.releaseCardAfterTimeout)
 		this.releaseCardAfterTimeout = setTimeout(() => {
 			this._cardReleased()
-		}, this.releaseCardAfter)
+		}, Math.max(this.releaseCardAfter, this.minimalAttachedTime - attachedDuration))
 	}
 
 	_cardAttached(id) {
