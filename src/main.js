@@ -21,6 +21,14 @@ module.exports = class Main {
 		this.portPath = portPath
 	}
 
+	setGroupsCount(count) {
+		this.cardGroups = count
+	}
+
+	setCardsPerGroup(count) {
+		this.cardsPerGroup = count
+	}
+
 	start() {
 		if (!this.portPath) {
 			throw new Error('Port not set.')
