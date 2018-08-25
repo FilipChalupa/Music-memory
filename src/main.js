@@ -1,77 +1,122 @@
 const SerialPort = require('serialport')
-const play = require('audio-play')
-const load = require('audio-loader')
-const path = require('path')
-const fs = require('fs')
 const shuffleArray = require('./utils/shuffleArray')
+const Player = require('./Player')
 
-const MUSIC_DIRECTORY = path.join(__dirname, '..', 'music')
-const CARD_PAIRS_COUNT = 3
-const PORT_PATH = 'COM5'
-const REPLAY_AFTER = 5000
+const ERROR_GROUP = 'error'
 
-console.log('Music memory')
-
-let allSoundFiles = []
-const cards = {}
-let assignedCards = 0
-let lastPlayedCard = ''
-let lastPlayedCardTimeout
-
-fs.readdir(MUSIC_DIRECTORY, function(error, files) {
-	if (error) {
-		return console.log('Unable to scan directory: ' + error)
+module.exports = class Main {
+	constructor() {
+		this.portPath = null
+		this.cardGroups = 3
+		this.cardsPerGroup = 2
+		this.attachedCard = null
+		this.releaseCardAfter = 500
+		this.releaseCardAfterTimeout = null
+		this.cards = {}
+		this.unallocatedMusicReferences = []
+		this.player = null
 	}
-	allSoundFiles = shuffleArray(files)
-	allSoundFiles = allSoundFiles.slice(0, CARD_PAIRS_COUNT)
-	allSoundFiles = allSoundFiles.concat(allSoundFiles)
-	allSoundFiles = shuffleArray(allSoundFiles)
-	console.log('Available sounds:', files.join(', '))
-	console.log('')
-})
 
-const port = new SerialPort(PORT_PATH)
-port.on('error', function(err) {
-	console.log('Error: ', err.message)
-})
+	setPortPath(portPath) {
+		this.portPath = portPath
+	}
 
-function processCard(uid) {
-	if (uid !== lastPlayedCard) {
-		console.log('Card detected:', uid)
-		if (!cards[uid]) {
-			console.log('Next sound assigned')
-			cards[uid] = allSoundFiles[assignedCards % allSoundFiles.length]
-			assignedCards++
-
-			if (assignedCards > CARD_PAIRS_COUNT * 2) {
-				console.log('Too many cards!')
-			}
+	start() {
+		if (!this.portPath) {
+			throw new Error('Port not set.')
 		}
-		const soundFile = cards[uid]
-		console.log('Playing:', soundFile)
-		console.log('')
 
-		load(path.join(MUSIC_DIRECTORY, soundFile)).then(play)
+		this.player = new Player(this.cardGroups)
 
-		lastPlayedCard = uid
-		clearTimeout(lastPlayedCardTimeout)
-		lastPlayedCardTimeout = setTimeout(() => {
-			lastPlayedCard = ''
-		}, REPLAY_AFTER)
+		this._shuffleMusic()
+
+		this._connectToArduino()
+	}
+
+	_shuffleMusic() {
+		this.unallocatedMusicReferences = shuffleArray(
+			new Array(this.cardGroups * this.cardsPerGroup).fill(0).map((_, i) => {
+				return i % this.cardGroups
+			})
+		)
+	}
+
+	_connectToArduino() {
+		const port = new SerialPort(this.portPath)
+
+		port.on('error', error => {
+			console.log('Error: ', error.message)
+		})
+
+		let waitingForLength = true
+		let nextIdLength = 1
+		port.on('readable', () => {
+			let chunk
+			while (
+				null !== (chunk = port.read(waitingForLength ? 1 : nextIdLength))
+			) {
+				if (waitingForLength) {
+					nextIdLength = chunk[0]
+				} else {
+					this._processCard(chunk.toString('base64'))
+				}
+				waitingForLength = !waitingForLength
+			}
+		})
+	}
+
+	_processCard(id) {
+		if (id !== this.attachedCard) {
+			this._cardAttached(id)
+		}
+
+		clearTimeout(this.releaseCardAfterTimeout)
+		this.releaseCardAfterTimeout = setTimeout(() => {
+			this._cardReleased()
+		}, this.releaseCardAfter)
+	}
+
+	_cardAttached(id) {
+		if (this.attachedCard !== null) {
+			this._cardReleased()
+		}
+		console.log('Card attached', id)
+
+		this.attachedCard = id
+
+		if (!this.cards[id]) {
+			this._createCard(id)
+		}
+
+		this._playCard(id)
+	}
+
+	_cardReleased() {
+		this.attachedCard = null
+		this.player.stop()
+		console.log('Card released')
+	}
+
+	_createCard(id) {
+		console.log('Creating card', id)
+		let group
+		if (this.unallocatedMusicReferences.length === 0) {
+			console.error('Too many cards')
+			group = ERROR_GROUP
+		} else {
+			group = this.unallocatedMusicReferences.pop()
+		}
+		this.cards[id] = {
+			group,
+		}
+	}
+
+	_playCard(id) {
+		const { group } = this.cards[id]
+		if (group === ERROR_GROUP) {
+			this.player.error()
+		} else {
+			this.player.start(group)
+		}
 	}
 }
-
-let waitingForLength = true
-let nextIdLength = 1
-
-port.on('readable', () => {
-	let chunk
-	while (null !== (chunk = port.read(waitingForLength ? 1 : nextIdLength))) {
-		if (waitingForLength) {
-			nextIdLength = chunk[0]
-		} else {
-			processCard(chunk.toString('base64'))
-		}
-		waitingForLength = !waitingForLength
-	}
-})
