@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+          content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Memory</title>
+</head>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+        }
+        #start::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+        }
+    </style>
+<body>
+    <h1>Sound Memory</h1>
+    <p>Put a card to your NFC enabled device.</p>
+    <p>Playing with <span id="numberOfCards">-</span> cards.</p>
+    <button type="button" id="start">Press to play</button>
+
+    <audio class="cardSound" src="./sounds/animals/bark.wav" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/cat.wav" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/chicken.mp3" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/donkey.wav" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/horse.wav" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/jazz-bark.wav" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/lion.wav" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/monkey.ogg" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/pig.wav" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/seal.wav" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/wookie.mp3" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/turkey.wav" preload></audio>
+    <audio class="cardSound" src="./sounds/animals/cock.wav" preload></audio>
+
+    <audio id="startSound" src="./sounds/general/start.wav" preload></audio>
+    <audio id="errorSound" src="./sounds/general/error.mp3" preload></audio>
+
+    <script>
+        const NUMBER_OF_PAIRS = 10
+        const cardIndexToPairNumber = []
+
+        const startSound = document.querySelector('#startSound')
+        const errorSound = document.querySelector('#errorSound')
+        let audioElements = Array.from(document.querySelectorAll('.cardSound'))
+
+        const playSound = (() => {
+            let playingAudio
+            return (audioElement) => {
+                if (playingAudio) {
+                    playingAudio.pause()
+                    playingAudio.currentTime = 0
+                }
+                audioElement.play()
+                playingAudio = audioElement
+            }
+        })()
+
+        document.querySelector('#numberOfCards').innerText = `${NUMBER_OF_PAIRS * 2}`
+        document.querySelector('#start').addEventListener('click', (event) => {
+            playSound(startSound)
+            event.target.remove()
+        })
+
+        // Initialize cards
+        for (let i = 0; i < NUMBER_OF_PAIRS * 2; i++) {
+            cardIndexToPairNumber[i] = i % NUMBER_OF_PAIRS
+        }
+        // Shuffle cards
+        for (let i = 0; i < NUMBER_OF_PAIRS * 2; i++) {
+            const newIndex = Math.floor(Math.random() * NUMBER_OF_PAIRS * 2)
+            const oldNewIndexValue = cardIndexToPairNumber[newIndex]
+            cardIndexToPairNumber[newIndex] = cardIndexToPairNumber[i]
+            cardIndexToPairNumber[i] = oldNewIndexValue
+        }
+
+        let foundCardsCount = 0
+        const foundCardsToCardIndex = {}
+
+        // shuffle audio elements
+        for (let i = 0; i < audioElements.length; i++) {
+            const newIndex = Math.floor(Math.random() * audioElements.length)
+            const oldNewIndexValue = audioElements[newIndex]
+            audioElements[newIndex] = audioElements[i]
+            audioElements[i] = oldNewIndexValue
+        }
+
+        const cardIdChannel = new BroadcastChannel('item')
+        const aliveChannel = new BroadcastChannel('alive')
+        cardIdChannel.addEventListener('message', (event) => {
+            const id = event.data || ''
+            aliveChannel.postMessage(id)
+
+            if (id === '') {
+                console.warn('Unknown card')
+                playSound(errorSound)
+                return
+            }
+
+            if (!(id in foundCardsToCardIndex)) {
+                console.info(`New card "${id}" found`)
+                if (foundCardsCount === cardIndexToPairNumber.length) {
+                    console.warn('Too many cards')
+                    playSound(errorSound)
+                    return
+                }
+                foundCardsToCardIndex[id] = foundCardsCount
+                foundCardsCount++
+                console.log('found cards', foundCardsToCardIndex)
+            }
+
+            const audio = audioElements[cardIndexToPairNumber[foundCardsToCardIndex[id]]]
+
+            if (!audio) {
+                console.warn('Too few audio files')
+                playSound(errorSound)
+                return
+            }
+
+            console.log('Playing', id, audio)
+
+            playSound(audio)
+        })
+    </script>
+</body>
+</html>
